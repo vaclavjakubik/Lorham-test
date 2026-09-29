@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lorham</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+</head>
+<body>
+  <nav class="container">
+    <ul>
+      <li><strong>Lorham</strong></li>
+    </ul>
+    <ul>
+      <!-- přepínač "pracuji jako" přibude, až budou existovat uživatelé v DB -->
+    </ul>
+  </nav>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <article class="{{ category }}">{{ message }}</article>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {# Dočasný obsah pro krok 3 (ověření DB spojení) – krok 4 ho nahradí seznamem poptávek. #}
+    {% if lead_count is defined %}
+      <p>Počet poptávek v databázi: {{ lead_count }}</p>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
