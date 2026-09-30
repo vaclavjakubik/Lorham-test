@@ -31,6 +31,12 @@ SOURCES = {
     "manual": "Ruční zadání",
 }
 
+# Role uživatelů
+ROLES = {
+    "sales": "Obchodník",
+    "manager": "Vedoucí",
+}
+
 # Typy aktivit
 ACTIVITY_TYPES = {
     "created": "Založeno",

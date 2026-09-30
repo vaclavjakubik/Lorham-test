@@ -9,10 +9,25 @@
 <body>
   <nav class="container">
     <ul>
-      <li><strong>Lorham</strong></li>
+      <li><a href="{{ url_for('index') }}"><strong>Lorham</strong></a></li>
+      <li><a href="{{ url_for('lead_new') }}">Nová poptávka</a></li>
     </ul>
     <ul>
-      <!-- přepínač "pracuji jako" přibude, až budou existovat uživatelé v DB -->
+      <li>
+        <form method="post" action="{{ url_for('switch_user') }}">
+          <fieldset role="group">
+            <select name="user_id" aria-label="Pracuji jako">
+              <option value="">— pracuji jako —</option>
+              {% for user in users %}
+                <option value="{{ user.id }}" {% if current_user and current_user.id == user.id %}selected{% endif %}>
+                  {{ user.name }} ({{ roles[user.role] }})
+                </option>
+              {% endfor %}
+            </select>
+            <button type="submit">Přepnout</button>
+          </fieldset>
+        </form>
+      </li>
     </ul>
   </nav>
 
@@ -24,11 +39,6 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
-
-    {# Dočasný obsah pro krok 3 (ověření DB spojení) – krok 4 ho nahradí seznamem poptávek. #}
-    {% if lead_count is defined %}
-      <p>Počet poptávek v databázi: {{ lead_count }}</p>
-    {% endif %}
 
     {% block content %}{% endblock %}
   </main>

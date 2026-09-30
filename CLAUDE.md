@@ -141,7 +141,7 @@ Vše v jedné transakci.
 ## Konvence
 - **Identifikátory anglicky** (proměnné, funkce, tabulky, sloupce), **komentáře a texty v UI česky**.
 - Mapování hodnot na české popisky (stavy, zdroje, typy aktivit) je v `config.py`.
-- SQL **vždy s parametry** (`%s`), nikdy f-string nebo skládání řetězců → ochrana proti SQL injection.
+-  SQL: hodnoty z requestu VŽDY jen jako parametry (%s). Kusy SQL (podmínky, ORDER BY) smí pocházet jen z literálů v kódu. Pokud o nich rozhoduje uživatel (např. řazení), vybírá se z whitelistu.
 - Každá zapisovací operace ve `services.py` běží v jedné transakci.
 - Časy se ukládají jako `timestamptz` (UTC), v UI se zobrazují v `Europe/Prague`.
 - Chyby a potvrzení uživateli přes Flask `flash()`.

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Poptávky</h1>
+
+  <form method="get" action="{{ url_for('index') }}">
+    <div class="grid">
+      <label>Stav
+        <select name="status">
+          <option value="">Všechny</option>
+          {% for key, label in statuses.items() %}
+            <option value="{{ key }}" {% if filters.status == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>Obchodník
+        <select name="assigned">
+          <option value="all" {% if filters.assigned_to is none and not filters.unassigned %}selected{% endif %}>Všichni</option>
+          <option value="none" {% if filters.unassigned %}selected{% endif %}>Nepřiřazeno</option>
+          {% for user in users %}
+            <option value="{{ user.id }}" {% if filters.assigned_to == user.id %}selected{% endif %}>{{ user.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>Zdroj
+        <select name="source">
+          <option value="">Všechny</option>
+          {% for key, label in sources.items() %}
+            <option value="{{ key }}" {% if filters.source == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <button type="submit">Filtrovat</button>
+    <a href="{{ url_for('index') }}" role="button" class="secondary outline">Zrušit filtry</a>
+  </form>
+
+  <div class="overflow-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Jméno</th>
+          <th>Zdroj</th>
+          <th>Stav</th>
+          <th>Obchodník</th>
+          <th>Vytvořeno</th>
+          <th>Poslední aktivita</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+          <tr>
+            <td>{{ lead.name }}</td>
+            <td>{{ sources[lead.source] }}</td>
+            <td>{{ statuses[lead.status] }}</td>
+            <td>{{ lead.assigned_name or "Nepřiřazeno" }}</td>
+            <td>{{ lead.created_at | local_time }}</td>
+            <td>{{ lead.last_activity_at | local_time }}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">Žádné poptávky neodpovídají filtru.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

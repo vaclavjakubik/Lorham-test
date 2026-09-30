@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Nová poptávka</h1>
+
+  <form method="post" action="{{ url_for('lead_new') }}">
+    <label>Jméno kontaktu *
+      <input type="text" name="name" value="{{ form.get('name', '') }}" required>
+    </label>
+
+    <div class="grid">
+      <label>E-mail
+        <input type="email" name="email" value="{{ form.get('email', '') }}">
+      </label>
+      <label>Telefon
+        <input type="tel" name="phone" value="{{ form.get('phone', '') }}">
+      </label>
+    </div>
+    <small>Vyplňte alespoň e-mail nebo telefon.</small>
+
+    <label>Zpráva od zákazníka
+      <textarea name="message" rows="4">{{ form.get('message', '') }}</textarea>
+    </label>
+
+    <div class="grid">
+      <label>Zdroj
+        {% set selected_source = form.get('source', 'manual') %}
+        <select name="source">
+          {% for key, label in sources.items() %}
+            <option value="{{ key }}" {% if selected_source == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>Obchodník
+        {% set selected_assigned = form.get('assigned_to', '') %}
+        <select name="assigned_to">
+          <option value="" {% if selected_assigned == '' %}selected{% endif %}>Automaticky (nejméně vytížený)</option>
+          <option value="none" {% if selected_assigned == 'none' %}selected{% endif %}>Nepřiřazeno (zatím nikomu)</option>
+          {% for user in users %}
+            <option value="{{ user.id }}" {% if selected_assigned == user.id | string %}selected{% endif %}>{{ user.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <label>Interní poznámka (jen pro tým, nepovinné)
+      <textarea name="note" rows="3">{{ form.get('note', '') }}</textarea>
+    </label>
+
+    <button type="submit">Založit poptávku</button>
+    <a href="{{ url_for('index') }}" role="button" class="secondary outline">Zrušit</a>
+  </form>
+{% endblock %}
