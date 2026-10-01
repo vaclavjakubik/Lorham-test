@@ -137,6 +137,7 @@ Vše v jedné transakci.
 | metoda | cesta | co dělá |
 |---|---|---|
 | GET | `/` | seznam poptávek; filtry: stav, obchodník, zdroj, jen zanedbané. Obchodník má defaultně filtr „moje" |
+| GET | `/leads` | přesměrování na `/` (adresa nemá vlastní stránku) |
 | GET, POST | `/leads/new` | ruční vytvoření; prázdný výběr obchodníka = automatické přiřazení |
 | GET | `/leads/<id>` | detail + historie aktivit (nejnovější nahoře) |
 | POST | `/leads/<id>/assign` | přeřazení obchodníkovi |

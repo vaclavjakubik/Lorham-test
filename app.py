@@ -198,6 +198,13 @@ def read_assignment_choice(choice):
     return user_id, False
 
 
+@app.route("/leads")
+def leads_redirect():
+    # Adresa /leads nemá vlastní stránku, seznam poptávek je na "/".
+    # Přesměrování je jen pro případ, že někdo adresu zkrátí ručně.
+    return redirect(url_for("index"))
+
+
 @app.route("/leads/new", methods=["GET", "POST"])
 def lead_new():
     if request.method == "GET":
