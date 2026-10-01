@@ -22,6 +22,31 @@ def local_time(value):
     return f"{local.day}. {local.month}. {local.year} {local:%H:%M}"
 
 
+def days_text(days):
+    # České skloňování podle celé hodnoty (ne podle poslední číslice):
+    # 1 den, 2-4 dny, jinak dní (tedy i 21 dní, 22 dní, 23 dní).
+    if days == 1:
+        return "1 den"
+    if 2 <= days <= 4:
+        return str(days) + " dny"
+    return str(days) + " dní"
+
+
+@app.template_filter("age_text")
+def age_text(age):
+    # Stáří (timedelta z databáze) jako krátký text: "40 min", "5 h", "4 dny".
+    # Zaokrouhluje dolů na celé jednotky. Minuty jsou jen pojistka pro případ,
+    # že by se v configu zkrátil práh pod hodinu.
+    if age is None:
+        return ""
+    seconds = int(age.total_seconds())
+    if seconds < 3600:
+        return str(seconds // 60) + " min"
+    if seconds < 24 * 3600:
+        return str(seconds // 3600) + " h"
+    return days_text(seconds // (24 * 3600))
+
+
 def to_int(text):
     # Převede text na číslo, při chybě vrátí None (neplatný vstup ignorujeme).
     try:
@@ -56,6 +81,7 @@ def inject_common_data():
         "statuses": config.STATUSES,
         "sources": config.SOURCES,
         "roles": config.ROLES,
+        "sla_labels": config.SLA_LABELS,
         "activity_types": config.ACTIVITY_TYPES,
         "manual_activity_types": config.MANUAL_ACTIVITY_TYPES,
     }
@@ -84,11 +110,15 @@ def read_lead_filters():
     if assigned_to not in [user["id"] for user in load_users()]:
         assigned_to = None
 
+    # Jen přesně "1" zapne filtr zanedbaných, cokoli jiného = vypnuto.
+    neglected = request.args.get("neglected") == "1"
+
     return {
         "status": status,
         "source": source,
         "assigned_to": assigned_to,
         "unassigned": unassigned,
+        "neglected": neglected,
     }
 
 
@@ -96,7 +126,26 @@ def read_lead_filters():
 def index():
     filters = read_lead_filters()
     leads = services.list_leads(**filters)
-    return render_template("leads_list.html", leads=leads, filters=filters)
+
+    # Počet zanedbaných mezi právě zobrazenými poptávkami (řádky už máme načtené,
+    # takže druhý dotaz není potřeba). Při zapnutém filtru jsou zanedbané všechny.
+    neglected_count = sum(1 for lead in leads if lead["sla_state"])
+
+    # Odkaz zapne (nebo vypne) filtr zanedbaných a ponechá ostatní parametry z URL,
+    # aby se neztratilo např. assigned=all.
+    link_args = request.args.to_dict()
+    link_args.pop("neglected", None)
+    if not filters["neglected"]:
+        link_args["neglected"] = "1"
+    neglected_url = url_for("index", **link_args)
+
+    return render_template(
+        "leads_list.html",
+        leads=leads,
+        filters=filters,
+        neglected_count=neglected_count,
+        neglected_url=neglected_url,
+    )
 
 
 @app.route("/switch-user", methods=["POST"])

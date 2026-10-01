@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# "with context": importovaný macro tak vidí i sla_labels z context_processoru. #}
+{% from "_sla.html" import sla_badge with context %}
 
 {% block content %}
   <h1>Poptávky</h1>
@@ -34,9 +36,23 @@
       </label>
     </div>
 
+    <label>
+      <input type="checkbox" name="neglected" value="1" {% if filters.neglected %}checked{% endif %}>
+      Jen zanedbané
+    </label>
+
     <button type="submit">Filtrovat</button>
     <a href="{{ url_for('index') }}" role="button" class="secondary outline">Zrušit filtry</a>
   </form>
+
+  <p>
+    {% if filters.neglected %}
+      Zobrazeny jen zanedbané poptávky: <strong>{{ neglected_count }}</strong>
+      · <a href="{{ neglected_url }}">Zobrazit všechny</a>
+    {% else %}
+      <a href="{{ neglected_url }}">Zanedbané poptávky: <strong>{{ neglected_count }}</strong></a>
+    {% endif %}
+  </p>
 
   <div class="overflow-auto">
     <table>
@@ -45,6 +61,7 @@
           <th>Jméno</th>
           <th>Zdroj</th>
           <th>Stav</th>
+          <th>SLA</th>
           <th>Obchodník</th>
           <th>Vytvořeno</th>
           <th>Poslední aktivita</th>
@@ -56,13 +73,14 @@
             <td><a href="{{ url_for('lead_detail', lead_id=lead.id) }}">{{ lead.name }}</a></td>
             <td>{{ sources[lead.source] }}</td>
             <td>{{ statuses[lead.status] }}</td>
+            <td>{{ sla_badge(lead) }}</td>
             <td>{{ lead.assigned_name or "Nepřiřazeno" }}</td>
             <td>{{ lead.created_at | local_time }}</td>
             <td>{{ lead.last_activity_at | local_time }}</td>
           </tr>
         {% else %}
           <tr>
-            <td colspan="6">Žádné poptávky neodpovídají filtru.</td>
+            <td colspan="7">Žádné poptávky neodpovídají filtru.</td>
           </tr>
         {% endfor %}
       </tbody>

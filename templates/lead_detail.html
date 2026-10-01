@@ -1,8 +1,12 @@
 {% extends "base.html" %}
+{% from "_sla.html" import sla_badge with context %}
 
 {% block content %}
   <p><a href="{{ url_for('index') }}">← Zpět na seznam</a></p>
   <h1>{{ lead.name }}</h1>
+  {% if lead.sla_state %}
+    <p>{{ sla_badge(lead) }}</p>
+  {% endif %}
 
   {# E-mail a telefon jsou odkazy. Předponu mailto: / tel: píšeme my, od uživatele je jen zbytek. #}
   <table>

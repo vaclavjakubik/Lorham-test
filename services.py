@@ -1,6 +1,38 @@
 import config
 import db
 
+# JEDINÉ místo, kde je definované SLA. Poddotaz vrací všechny sloupce poptávky navíc se:
+#   sla_state = 'no_response' (🔴) / 'stale' (🟠) / NULL (v pořádku),
+#   sla_age   = jak dlouho už je poptávka v tom stavu (interval, počítá ho databáze).
+# CASE se vyhodnocuje shora, takže 🔴 má přednost před 🟠.
+# Uzavřené poptávky (won, lost) nemůžou dostat ani jeden příznak.
+# Čas bere jen now() z databáze. Dva znaky %s jsou prahy: nejdřív SLA_FIRST_RESPONSE,
+# potom SLA_STALE (pořadí hlídá sla_params()).
+# Použití: "FROM (" + LEADS_WITH_SLA_SQL + ") l" a parametry sla_params() hned na začátek.
+LEADS_WITH_SLA_SQL = """
+    SELECT s.*,
+           CASE s.sla_state
+               WHEN 'no_response' THEN now() - s.created_at
+               WHEN 'stale' THEN now() - s.last_activity_at
+           END AS sla_age
+    FROM (
+        SELECT l.*,
+               CASE
+                   WHEN l.status = 'new' AND l.first_response_at IS NULL
+                        AND l.created_at < now() - %s THEN 'no_response'
+                   WHEN l.status NOT IN ('won', 'lost')
+                        AND l.last_activity_at < now() - %s THEN 'stale'
+               END AS sla_state
+        FROM leads l
+    ) s
+"""
+
+
+def sla_params():
+    # Hodnoty pro dva %s v LEADS_WITH_SLA_SQL, ve stejném pořadí jako v dotazu.
+    # timedelta převede psycopg na interval.
+    return [config.SLA_FIRST_RESPONSE, config.SLA_STALE]
+
 
 def list_users():
     # Aktivní uživatelé pro přepínač "pracuji jako" a pro filtr obchodníka.
@@ -10,12 +42,17 @@ def list_users():
     )
 
 
-def list_leads(status=None, source=None, assigned_to=None, unassigned=False):
-    # Vrátí poptávky, nejnovější nahoře. Každý vyplněný filtr přidá jednu podmínku.
+def list_leads(status=None, source=None, assigned_to=None, unassigned=False, neglected=False):
+    # Vrátí poptávky: nahoře zanedbané (🔴, pak 🟠), potom ostatní. Každý vyplněný filtr
+    # přidá jednu podmínku.
     # conditions = kousky SQL napsané natvrdo tady v kódu,
     # params = hodnoty od uživatele, které jdou do dotazu odděleně přes %s.
     conditions = []
     params = []
+
+    if neglected:
+        # sla_state je sloupec poddotazu ve FROM, takže ho WHERE vidí.
+        conditions.append("l.sla_state IS NOT NULL")
 
     if status:
         conditions.append("l.status = %s")
@@ -35,13 +72,26 @@ def list_leads(status=None, source=None, assigned_to=None, unassigned=False):
 
     select_part = """
         SELECT l.id, l.name, l.source, l.status, l.created_at, l.last_activity_at,
+               l.sla_state, l.sla_age,
                l.assigned_to, u.name AS assigned_name
-        FROM leads l
+        FROM (""" + LEADS_WITH_SLA_SQL + """) l
         LEFT JOIN users u ON u.id = l.assigned_to
     """
-    order_part = "ORDER BY l.created_at DESC, l.id DESC"
+    # Pořadí: 1) 🔴, 2) 🟠, 3) ostatní.
+    # Uvnitř 🔴 nejstarší created_at nahoře, uvnitř 🟠 nejstarší last_activity_at nahoře,
+    # ostatní nejnovější nahoře. CASE bez ELSE dává NULL, takže se daný klíč
+    # uplatní jen u řádků své skupiny; id na konci řadí řádky se stejným časem stabilně.
+    order_part = """
+        ORDER BY
+            CASE l.sla_state WHEN 'no_response' THEN 0 WHEN 'stale' THEN 1 ELSE 2 END,
+            CASE WHEN l.sla_state = 'no_response' THEN l.created_at END ASC,
+            CASE WHEN l.sla_state = 'stale' THEN l.last_activity_at END ASC,
+            l.created_at DESC, l.id DESC
+    """
 
-    return db.fetch_all(select_part + where + " " + order_part, params)
+    # Parametry jdou v pořadí, v jakém jsou %s v dotazu: prahy SLA (poddotaz ve FROM),
+    # pak hodnoty filtrů z WHERE.
+    return db.fetch_all(select_part + where + " " + order_part, sla_params() + params)
 
 
 def clean_text(value):
@@ -112,17 +162,20 @@ def apply_assignment(cur, lead_id, new_user, actor_id, old_name=None, automatic=
 
 
 def get_lead(lead_id):
-    # Jedna poptávka pro detail (včetně jména obchodníka), nebo None, když neexistuje.
+    # Jedna poptávka pro detail (včetně jména obchodníka a SLA stavu),
+    # nebo None, když neexistuje.
+    # Parametry: nejdřív dva prahy SLA (poddotaz je ve FROM), pak id poptávky.
     rows = db.fetch_all(
         """
         SELECT l.id, l.name, l.email, l.phone, l.message, l.source, l.status,
                l.created_at, l.first_response_at, l.last_activity_at,
+               l.sla_state, l.sla_age,
                l.assigned_to, u.name AS assigned_name
-        FROM leads l
+        FROM (""" + LEADS_WITH_SLA_SQL + """) l
         LEFT JOIN users u ON u.id = l.assigned_to
         WHERE l.id = %s
         """,
-        (lead_id,),
+        sla_params() + [lead_id],
     )
     if not rows:
         return None

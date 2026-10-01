@@ -1,0 +1,8 @@
+{# Štítek SLA příznaku, společný pro seznam i detail. Pro poptávku bez příznaku nevypíše nic. #}
+{# Ikona má aria-hidden, aby ji čtečka obrazovky nečetla jako "červený kruh" před textem. #}
+{% macro sla_badge(lead) %}
+  {% if lead.sla_state %}
+    {% set label = sla_labels[lead.sla_state] %}
+    <span class="sla-badge sla-{{ lead.sla_state }}"><span aria-hidden="true">{{ label.icon }}</span> {{ label.text }} {{ lead.sla_age | age_text }}</span>
+  {% endif %}
+{% endmacro %}

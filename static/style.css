@@ -1,7 +1,46 @@
-/* Vlastní doplňky k Pico.css. Barvy SLA přibydou v kroku 9. */
+/* Vlastní doplňky k Pico.css. */
 
 /* Víceřádkový text (zpráva poptávky, poznámky): zachová konce řádků a zalamuje dlouhé řádky.
    Je to jen CSS, text se do stránky vkládá escapovaně (bez |safe). */
 .multiline {
   white-space: pre-line;
+}
+
+/* Štítek SLA příznaku. Význam nese ikona + text, barva je jen doplněk
+   (čitelné i pro barvoslepé). Tmavý text na světlém podkladu, ať je kontrast vysoký. */
+.sla-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid;
+  border-radius: 0.5rem;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sla-no_response {
+  background: #fde8e8;
+  border-color: #c0392b;
+  color: #7a1212;
+}
+
+.sla-stale {
+  background: #fff1e0;
+  border-color: #c76a00;
+  color: #6b3a00;
+}
+
+/* Pico se v tmavém režimu přepíná podle systému, štítky proto taky. */
+@media (prefers-color-scheme: dark) {
+  .sla-no_response {
+    background: #4a1717;
+    border-color: #e57373;
+    color: #ffd6d6;
+  }
+
+  .sla-stale {
+    background: #4a2c0a;
+    border-color: #f0a050;
+    color: #ffe0b8;
+  }
 }

@@ -13,6 +13,12 @@ WEBHOOK_TOKEN = os.environ["WEBHOOK_TOKEN"]
 SLA_FIRST_RESPONSE = timedelta(hours=2)
 SLA_STALE = timedelta(days=3)
 
+# Popisky SLA příznaků (klíče vrací SQL jako sla_state). Ikona i text, ne jen barva.
+SLA_LABELS = {
+    "no_response": {"icon": "🔴", "text": "Bez reakce"},
+    "stale": {"icon": "🟠", "text": "Bez aktivity"},
+}
+
 # Stavy poptávky
 STATUSES = {
     "new": "Nová",

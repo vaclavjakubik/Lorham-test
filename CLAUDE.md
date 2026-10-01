@@ -33,6 +33,7 @@ db.py             # připojení k DB a pomocné funkce pro dotazy
 config.py         # konstanty (SLA, stavy, zdroje, popisky v UI) + načtení env proměnných
 templates/
   base.html       # layout, navigace, přepínač „pracuji jako", flash zprávy
+    _sla.html       # makro se SLA štítkem (sdílí ho seznam i detail)
   leads_list.html # seznam poptávek + filtry
   lead_detail.html
   lead_new.html
@@ -101,10 +102,12 @@ Samotné přiřazení se jako reakce NEPOČÍTÁ (přiřazení ≠ kontakt se z�
 ### SLA – počítá se při čtení, žádný cron
 - 🔴 **Bez reakce**: status = `new` AND first_response_at IS NULL
   AND created_at < now() − `SLA_FIRST_RESPONSE` (2 h)
-- 🟠 **Usnulá**: status IN (`contacted`, `offer`)
+- 🟠 **Usnulá**: otevřená poptávka (status není `won` ani `lost`)
   AND last_activity_at < now() − `SLA_STALE` (3 dny)
-- Hodnoty jsou konstanty v `config.py`. Pracovní doba a víkendy se v prototypu neřeší.
-- V seznamu jsou zanedbané poptávky nahoře (nejdřív 🔴, pak 🟠), pak nejnovější.
+- V CASE se 🔴 vyhodnocuje první, takže má přednost před 🟠.
+- SLA výraz je definovaný na jednom místě a sdílí ho seznam, detail i dashboard.
+- Hodnoty jsou konstanty v `config.py` (timedelta), do dotazu jdou jako parametry. Pracovní doba a víkendy se v prototypu neřeší.
+- Řazení: 🔴 (nejstarší created_at nahoře), pak 🟠 (nejstarší last_activity_at nahoře), pak ostatní (nejnovější nahoře).
 
 ### Automatické přiřazení
 Aktivní obchodník (role `sales`, is_active) s **nejmenším počtem otevřených poptávek**.
