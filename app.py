@@ -13,6 +13,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+# Příliš velké tělo požadavku Flask odmítne s chybou 413 (stránka, ne JSON).
+app.config["MAX_CONTENT_LENGTH"] = config.MAX_CONTENT_LENGTH
 
 PRAGUE = ZoneInfo("Europe/Prague")
 

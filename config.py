@@ -71,6 +71,15 @@ MANUAL_ACTIVITY_TYPES = ["call", "email", "meeting", "note"]
 # Nejdelší povolená poznámka k aktivitě (znaků)
 ACTIVITY_NOTE_MAX_LENGTH = 2000
 
+# Limity textů při zakládání poptávky (znaků): jméno, e-mail a telefon, zpráva zákazníka
+LEAD_NAME_MAX_LENGTH = 200
+LEAD_CONTACT_MAX_LENGTH = 200
+LEAD_MESSAGE_MAX_LENGTH = 5000
+
+# Největší povolená velikost těla HTTP požadavku (bajtů). Větší požadavek Flask odmítne chybou 413
+# ještě před zpracováním. 64 kB bohatě stačí na formulář i webhook s limity výše.
+MAX_CONTENT_LENGTH = 64 * 1024
+
 # E-mail: adresa HTTP API služby Resend (port 443; SMTP porty Render na free tieru blokuje),
 # čekání na odpověď v sekundách a kolik znaků textu poptávky se vejde do e-mailu
 RESEND_API_URL = "https://api.resend.com/emails"

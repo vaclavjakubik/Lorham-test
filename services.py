@@ -122,8 +122,17 @@ def clean_text(value):
         return None
     if "\x00" in value:
         raise ValueError("Text nesmí obsahovat nulový znak.")
-    value = value.strip()
+    # Konec řádku z textarea chodí jako \r\n (2 znaky); sjednotíme na \n, ať se délka
+    # počítá stejně jako v prohlížeči (stejné pravidlo má add_activity).
+    value = value.replace("\r\n", "\n").strip()
     return value or None
+
+
+def check_max_length(value, max_length, label):
+    # Zkontroluje délku už vyčištěného textu. None (nevyplněno) je v pořádku.
+    # label je český název pole do hlášky, např. "Jméno".
+    if value is not None and len(value) > max_length:
+        raise ValueError(label + " může mít nejvýše " + str(max_length) + " znaků.")
 
 
 def insert_activity(cur, lead_id, user_id, activity_type, note=None):
@@ -524,6 +533,13 @@ def create_lead(name, email, phone, message, source,
     if source not in config.SOURCES:
         raise ValueError("Neplatný zdroj poptávky.")
 
+    # Limity délky: poznámka má stejný limit jako ruční aktivita (add_activity).
+    check_max_length(name, config.LEAD_NAME_MAX_LENGTH, "Jméno")
+    check_max_length(email, config.LEAD_CONTACT_MAX_LENGTH, "E-mail")
+    check_max_length(phone, config.LEAD_CONTACT_MAX_LENGTH, "Telefon")
+    check_max_length(message, config.LEAD_MESSAGE_MAX_LENGTH, "Zpráva")
+    check_max_length(note, config.ACTIVITY_NOTE_MAX_LENGTH, "Poznámka")
+
     # Objednávka e-mailu z apply_assignment; None = nic se posílat nebude.
     notification = None
 
@@ -560,6 +576,8 @@ def create_lead(name, email, phone, message, source,
                 automatic=automatic,
             )
 
+        # Interní poznámka při založení se záměrně NEPOČÍTÁ jako reakce (first_response_at
+        # zůstává prázdné): není to kontakt se zákazníkem. Na rozdíl od add_activity.
         if note is not None:
             insert_activity(cur, lead_id, actor_id, "note", note)
 
