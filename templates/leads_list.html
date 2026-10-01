@@ -45,6 +45,17 @@
     <a href="{{ url_for('index') }}" role="button" class="secondary outline">Zrušit filtry</a>
   </form>
 
+  {# Filtry bez políčka ve formuláři (přicházejí z odkazů na dashboardu): ukážeme je a nabídneme zrušení. #}
+  {% if filters.open_only or filters.sla %}
+    <p>
+      Aktivní filtr:
+      {% if filters.open_only %}jen otevřené{% endif %}
+      {% if filters.open_only and filters.sla %} · {% endif %}
+      {% if filters.sla %}<span aria-hidden="true">{{ sla_labels[filters.sla].icon }}</span> {{ sla_labels[filters.sla].text }}{% endif %}
+      · <a href="{{ clear_url }}">Zrušit tento filtr</a>
+    </p>
+  {% endif %}
+
   <p>
     {% if filters.neglected %}
       Zobrazeny jen zanedbané poptávky: <strong>{{ neglected_count }}</strong>

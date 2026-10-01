@@ -30,6 +30,28 @@
   color: #6b3a00;
 }
 
+/* Dashboard: velké číslo v kartě souhrnu. Odkaz-štítek v něm má mít stejně velké písmo. */
+.stat {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.stat .sla-badge {
+  font-size: 1em;
+}
+
+a.sla-badge {
+  text-decoration: none;
+}
+
+/* Řádek "Nepřiřazeno" s otevřenými poptávkami: nikdo je nemá na starosti.
+   Barva zvýraznění je z Pico, takže funguje ve světlém i tmavém režimu. */
+.unassigned-row td {
+  background: var(--pico-mark-background-color);
+  font-weight: 600;
+}
+
 /* Pico se v tmavém režimu přepíná podle systému, štítky proto taky. */
 @media (prefers-color-scheme: dark) {
   .sla-no_response {

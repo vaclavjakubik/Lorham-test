@@ -12,6 +12,9 @@
     <ul>
       <li><a href="{{ url_for('index') }}"><strong>Lorham</strong></a></li>
       <li><a href="{{ url_for('lead_new') }}">Nová poptávka</a></li>
+      {% if current_user and current_user.role == 'manager' %}
+        <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      {% endif %}
     </ul>
     <ul>
       <li>

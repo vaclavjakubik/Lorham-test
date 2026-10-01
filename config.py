@@ -13,6 +13,9 @@ WEBHOOK_TOKEN = os.environ["WEBHOOK_TOKEN"]
 SLA_FIRST_RESPONSE = timedelta(hours=2)
 SLA_STALE = timedelta(days=3)
 
+# Období, za které dashboard počítá zdroje a průměrnou dobu reakce (pevné, bez výběru data)
+DASHBOARD_PERIOD = timedelta(days=30)
+
 # Popisky SLA příznaků (klíče vrací SQL jako sla_state). Ikona i text, ne jen barva.
 SLA_LABELS = {
     "no_response": {"icon": "🔴", "text": "Bez reakce"},

@@ -113,12 +113,23 @@ def read_lead_filters():
     # Jen přesně "1" zapne filtr zanedbaných, cokoli jiného = vypnuto.
     neglected = request.args.get("neglected") == "1"
 
+    # Konkrétní SLA příznak (jen 🔴 nebo jen 🟠). Whitelist = klíče z config.SLA_LABELS.
+    # Tyhle dva filtry nemají políčko ve formuláři, používají je odkazy z dashboardu.
+    sla = request.args.get("sla")
+    if sla not in config.SLA_LABELS:
+        sla = None
+
+    # Jen otevřené poptávky (status není won ani lost). Zapíná je přesně "1".
+    open_only = request.args.get("open") == "1"
+
     return {
         "status": status,
         "source": source,
         "assigned_to": assigned_to,
         "unassigned": unassigned,
         "neglected": neglected,
+        "open_only": open_only,
+        "sla": sla,
     }
 
 
@@ -139,12 +150,20 @@ def index():
         link_args["neglected"] = "1"
     neglected_url = url_for("index", **link_args)
 
+    # Odkaz, který vypne filtry "jen otevřené" a "jen konkrétní SLA příznak"
+    # a ostatní parametry nechá být.
+    clear_args = request.args.to_dict()
+    clear_args.pop("open", None)
+    clear_args.pop("sla", None)
+    clear_url = url_for("index", **clear_args)
+
     return render_template(
         "leads_list.html",
         leads=leads,
         filters=filters,
         neglected_count=neglected_count,
         neglected_url=neglected_url,
+        clear_url=clear_url,
     )
 
 
@@ -287,6 +306,21 @@ def lead_add_activity(lead_id):
     else:
         flash("Aktivita byla zapsána.", "success")
     return redirect(url_for("lead_detail", lead_id=lead_id))
+
+
+@app.route("/dashboard")
+def dashboard():
+    # Roli (jen vedoucí) kontroluje služba; odkaz v navigaci je jen pohodlí.
+    try:
+        data = services.get_dashboard(get_current_user_id())
+    except (ValueError, PermissionError) as error:
+        flash(str(error), "error")
+        return redirect(url_for("index"))
+    return render_template(
+        "dashboard.html",
+        period_text=days_text(config.DASHBOARD_PERIOD.days),
+        **data,
+    )
 
 
 def is_valid_webhook_token(header_value):

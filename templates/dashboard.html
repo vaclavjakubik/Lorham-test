@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{# Číslo jako odkaz na seznam. Nula je obyčejný text (odkaz na prázdný seznam nemá smysl).
+   state = 'no_response' / 'stale' obarví číslo stejně jako SLA štítek; bez state je číslo bez barvy. #}
+{% macro count_link(count, url, state=None) %}
+  {% if count == 0 %}
+    0
+  {% elif state %}
+    <a class="sla-badge sla-{{ state }}" href="{{ url }}">{{ count }}</a>
+  {% else %}
+    <a href="{{ url }}">{{ count }}</a>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+  <h1>Dashboard</h1>
+
+  {# 1) Souhrn #}
+  <h2>Souhrn</h2>
+  <div class="grid">
+    <article>
+      <header>Otevřené poptávky</header>
+      <p class="stat">{{ count_link(summary.open_count, url_for('index', assigned='all', open=1)) }}</p>
+    </article>
+    <article>
+      <header><span class="sla-badge sla-no_response"><span aria-hidden="true">{{ sla_labels.no_response.icon }}</span> {{ sla_labels.no_response.text }}</span></header>
+      <p class="stat">{{ count_link(summary.no_response_count, url_for('index', assigned='all', sla='no_response'), 'no_response') }}</p>
+    </article>
+    <article>
+      <header><span class="sla-badge sla-stale"><span aria-hidden="true">{{ sla_labels.stale.icon }}</span> {{ sla_labels.stale.text }}</span></header>
+      <p class="stat">{{ count_link(summary.stale_count, url_for('index', assigned='all', sla='stale'), 'stale') }}</p>
+    </article>
+  </div>
+
+  {# 2) Obchodníci #}
+  <h2>Obchodníci</h2>
+  <div class="overflow-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Obchodník</th>
+          <th>Otevřené</th>
+          <th><span aria-hidden="true">{{ sla_labels.no_response.icon }}</span> {{ sla_labels.no_response.text }}</th>
+          <th><span aria-hidden="true">{{ sla_labels.stale.icon }}</span> {{ sla_labels.stale.text }}</th>
+          <th>Ø reakce ({{ period_text }})</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in salespeople %}
+          <tr>
+            <td>{{ person.name }}</td>
+            <td>{{ count_link(person.open_count, url_for('index', assigned=person.id, open=1)) }}</td>
+            <td>{{ count_link(person.no_response_count, url_for('index', assigned=person.id, sla='no_response'), 'no_response') }}</td>
+            <td>{{ count_link(person.stale_count, url_for('index', assigned=person.id, sla='stale'), 'stale') }}</td>
+            {# "is not none": průměr 0 sekund je platná hodnota, jen prázdný (NULL) dává "—". #}
+            <td>{% if person.avg_response is not none %}{{ person.avg_response | age_text }}{% else %}—{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="5">Žádní aktivní obchodníci.</td>
+          </tr>
+        {% endfor %}
+        {# Nepřiřazené poptávky nemá nikdo na starosti, proto je řádek zvýrazněný, když v něm něco je. #}
+        <tr {% if unassigned.open_count > 0 %}class="unassigned-row"{% endif %}>
+          <td>Nepřiřazeno</td>
+          <td>{{ count_link(unassigned.open_count, url_for('index', assigned='none', open=1)) }}</td>
+          <td>{{ count_link(unassigned.no_response_count, url_for('index', assigned='none', sla='no_response'), 'no_response') }}</td>
+          <td>{{ count_link(unassigned.stale_count, url_for('index', assigned='none', sla='stale'), 'stale') }}</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {# 3) Zdroje za poslední období #}
+  <h2>Zdroje (posledních {{ period_text }})</h2>
+  <div class="overflow-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Zdroj</th>
+          <th>Poptávek</th>
+          <th>Vyhráno</th>
+          <th>Prohráno</th>
+          <th>Podíl vyhraných z uzavřených</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in source_stats %}
+          <tr>
+            <td>{{ sources[row.source] }}</td>
+            <td>{{ row.total }}</td>
+            <td>{{ row.won }}</td>
+            <td>{{ row.lost }}</td>
+            <td>{% if row.share_percent is not none %}{{ row.share_percent }}&nbsp;%{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# 4) Stavy (funnel) #}
+  <h2>Stavy</h2>
+  <div class="overflow-auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Stav</th>
+          <th>Poptávek</th>
+          <th>Podíl ze všech</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in status_stats %}
+          <tr>
+            <td>{{ statuses[row.status] }}</td>
+            <td>{{ row.count }}</td>
+            <td>{% if total_leads > 0 %}<progress value="{{ row.count }}" max="{{ total_leads }}"></progress>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

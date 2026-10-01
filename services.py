@@ -34,6 +34,18 @@ def sla_params():
     return [config.SLA_FIRST_RESPONSE, config.SLA_STALE]
 
 
+# Tři počítadla společná pro souhrn, tabulku obchodníků a řádek "Nepřiřazeno" na dashboardu.
+# Alias poptávky musí být "l" (FROM (LEADS_WITH_SLA_SQL) l). Pravidla SLA tu nejsou,
+# jen se spočítá, kolik řádků dostalo který příznak z LEADS_WITH_SLA_SQL.
+# COUNT(...) FILTER (WHERE podmínka) = spočítej jen řádky, pro které podmínka platí.
+# Uzavřené poptávky nemají sla_state, takže 🔴 a 🟠 jsou vždy otevřené.
+DASHBOARD_COUNTS_SQL = """
+    count(l.id) FILTER (WHERE l.status NOT IN ('won', 'lost')) AS open_count,
+    count(l.id) FILTER (WHERE l.sla_state = 'no_response') AS no_response_count,
+    count(l.id) FILTER (WHERE l.sla_state = 'stale') AS stale_count
+"""
+
+
 def list_users():
     # Aktivní uživatelé pro přepínač "pracuji jako" a pro filtr obchodníka.
     return db.fetch_all(
@@ -42,7 +54,8 @@ def list_users():
     )
 
 
-def list_leads(status=None, source=None, assigned_to=None, unassigned=False, neglected=False):
+def list_leads(status=None, source=None, assigned_to=None, unassigned=False, neglected=False,
+               open_only=False, sla=None):
     # Vrátí poptávky: nahoře zanedbané (🔴, pak 🟠), potom ostatní. Každý vyplněný filtr
     # přidá jednu podmínku.
     # conditions = kousky SQL napsané natvrdo tady v kódu,
@@ -53,6 +66,12 @@ def list_leads(status=None, source=None, assigned_to=None, unassigned=False, neg
     if neglected:
         # sla_state je sloupec poddotazu ve FROM, takže ho WHERE vidí.
         conditions.append("l.sla_state IS NOT NULL")
+    if sla:
+        # Jen jeden konkrétní příznak (🔴 nebo 🟠). Hodnotu už route ověřila podle whitelistu.
+        conditions.append("l.sla_state = %s")
+        params.append(sla)
+    if open_only:
+        conditions.append("l.status NOT IN ('won', 'lost')")
 
     if status:
         conditions.append("l.status = %s")
@@ -349,6 +368,109 @@ def change_status(lead_id, new_status, actor_id):
         insert_activity(cur, lead_id, actor_id, "status_change", note)
 
     return {"changed": True, "old_status": old_status, "new_status": new_status}
+
+
+def get_dashboard(actor_id):
+    # Data pro dashboard vedoucího (4 bloky). Smí jen aktivní vedoucí (actor_id).
+    # Vyhodí: ValueError (nikdo není vybraný), PermissionError (není vedoucí).
+    # Všechny dotazy běží v jednom spojení (jedna transakce), ať se nepřipojujeme pětkrát.
+    if actor_id is None:
+        raise ValueError("Nejdřív vyberte, kdo pracuje.")
+
+    with db.transaction() as cur:
+        cur.execute(
+            "SELECT id FROM users WHERE id = %s AND role = 'manager' AND is_active = TRUE",
+            (actor_id,),
+        )
+        if cur.fetchone() is None:
+            raise PermissionError("Přehled může zobrazit jen vedoucí.")
+
+        # 1) Souhrn přes všechny poptávky (jeden řádek bez GROUP BY).
+        cur.execute(
+            "SELECT " + DASHBOARD_COUNTS_SQL + " FROM (" + LEADS_WITH_SLA_SQL + ") l",
+            sla_params(),
+        )
+        summary = cur.fetchone()
+
+        # 2) Aktivní obchodníci. LEFT JOIN, ať obchodník bez poptávek zůstane s nulami.
+        # avg() přeskočí NULL, takže poptávky bez reakce se do průměru nezapočítají;
+        # když nemá reakci žádná, vyjde NULL. Průměr bere jen poptávky z posledního období.
+        # Pořadí %s = pořadí v textu dotazu: nejdřív období (SELECT), potom prahy SLA (JOIN).
+        cur.execute(
+            """
+            SELECT u.id, u.name, """ + DASHBOARD_COUNTS_SQL + """,
+                   avg(l.first_response_at - l.created_at)
+                       FILTER (WHERE l.created_at >= now() - %s) AS avg_response
+            FROM users u
+            LEFT JOIN (""" + LEADS_WITH_SLA_SQL + """) l ON l.assigned_to = u.id
+            WHERE u.role = 'sales' AND u.is_active = TRUE
+            GROUP BY u.id, u.name
+            ORDER BY u.name
+            """,
+            [config.DASHBOARD_PERIOD] + sla_params(),
+        )
+        salespeople = cur.fetchall()
+
+        # Nepřiřazené poptávky: stejná počítadla, jen řádky bez obchodníka.
+        cur.execute(
+            "SELECT " + DASHBOARD_COUNTS_SQL
+            + " FROM (" + LEADS_WITH_SLA_SQL + ") l WHERE l.assigned_to IS NULL",
+            sla_params(),
+        )
+        unassigned = cur.fetchone()
+
+        # 3) Zdroje: poptávky vytvořené za poslední období a jejich AKTUÁLNÍ stav.
+        cur.execute(
+            """
+            SELECT l.source,
+                   count(*) AS total_count,
+                   count(*) FILTER (WHERE l.status = 'won') AS won_count,
+                   count(*) FILTER (WHERE l.status = 'lost') AS lost_count
+            FROM leads l
+            WHERE l.created_at >= now() - %s
+            GROUP BY l.source
+            """,
+            (config.DASHBOARD_PERIOD,),
+        )
+        source_rows = {row["source"]: row for row in cur.fetchall()}
+
+        # 4) Stavy (funnel): všechny poptávky bez časového omezení.
+        cur.execute("SELECT l.status, count(*) AS lead_count FROM leads l GROUP BY l.status")
+        status_counts = {row["status"]: row["lead_count"] for row in cur.fetchall()}
+
+    # SQL vrací jen zdroje a stavy, které v datech jsou. Procházíme proto config
+    # (v jeho pořadí) a chybějící doplníme nulou.
+    source_stats = []
+    for key in config.SOURCES:
+        row = source_rows.get(key)
+        total = row["total_count"] if row else 0
+        won = row["won_count"] if row else 0
+        lost = row["lost_count"] if row else 0
+        closed = won + lost
+        # Podíl vyhraných z uzavřených. Bez uzavřených poptávek None (v šabloně "—"),
+        # takže se nikdy nedělí nulou.
+        share_percent = round(won * 100 / closed) if closed > 0 else None
+        source_stats.append({
+            "source": key,
+            "total": total,
+            "won": won,
+            "lost": lost,
+            "share_percent": share_percent,
+        })
+
+    status_stats = [{"status": key, "count": status_counts.get(key, 0)} for key in config.STATUSES]
+    total_leads = sum(item["count"] for item in status_stats)
+
+    # Klíče "source_stats" a "status_stats" (ne "sources"/"statuses"): ty už šablony dostávají
+    # z context_processoru jako slovníky popisků a nesmíme je přepsat.
+    return {
+        "summary": summary,
+        "salespeople": salespeople,
+        "unassigned": unassigned,
+        "source_stats": source_stats,
+        "status_stats": status_stats,
+        "total_leads": total_leads,
+    }
 
 
 def create_lead(name, email, phone, message, source,
