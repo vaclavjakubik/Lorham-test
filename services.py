@@ -116,8 +116,12 @@ def list_leads(status=None, source=None, assigned_to=None, unassigned=False, neg
 
 def clean_text(value):
     # Ořízne mezery na okrajích; prázdný text změní na None (v DB bude NULL).
+    # Znak NUL (kód 0) PostgreSQL v textu neumí uložit a zápis by skončil chybou 500,
+    # proto ho odmítneme hned tady. Volající (formulář, webhook) ValueError převedou na hlášku / 400.
     if value is None:
         return None
+    if "\x00" in value:
+        raise ValueError("Text nesmí obsahovat nulový znak.")
     value = value.strip()
     return value or None
 
