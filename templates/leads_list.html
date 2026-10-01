@@ -53,7 +53,7 @@
       <tbody>
         {% for lead in leads %}
           <tr>
-            <td>{{ lead.name }}</td>
+            <td><a href="{{ url_for('lead_detail', lead_id=lead.id) }}">{{ lead.name }}</a></td>
             <td>{{ sources[lead.source] }}</td>
             <td>{{ statuses[lead.status] }}</td>
             <td>{{ lead.assigned_name or "Nepřiřazeno" }}</td>

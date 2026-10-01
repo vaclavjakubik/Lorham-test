@@ -37,7 +37,7 @@
         <select name="assigned_to">
           <option value="" {% if selected_assigned == '' %}selected{% endif %}>Automaticky (nejméně vytížený)</option>
           <option value="none" {% if selected_assigned == 'none' %}selected{% endif %}>Nepřiřazeno (zatím nikomu)</option>
-          {% for user in users %}
+          {% for user in users if user.role == 'sales' %}
             <option value="{{ user.id }}" {% if selected_assigned == user.id | string %}selected{% endif %}>{{ user.name }}</option>
           {% endfor %}
         </select>

@@ -1,7 +1,7 @@
 import hmac
 from zoneinfo import ZoneInfo
 
-from flask import Flask, flash, g, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 import config
 import services
@@ -130,6 +130,12 @@ def lead_new():
 
     form = request.form
     current_user = get_current_user()
+    # Bez vybraného uživatele by se autor zapsal jako "systém", což není pravda.
+    # Kontrola je tady, ne v create_lead: tu volá i webhook, kde autor None sedí.
+    if current_user is None:
+        flash("Nejdřív vyberte, kdo pracuje.", "error")
+        return render_template("lead_new.html", form=form)
+
     try:
         assigned_to, auto_assign = read_assignment_choice(form.get("assigned_to", ""))
         result = services.create_lead(
@@ -153,6 +159,63 @@ def lead_new():
     else:
         flash("Poptávka byla založena, zatím je nepřiřazená.", "success")
     return redirect(url_for("index"))
+
+
+@app.route("/leads/<int:lead_id>")
+def lead_detail(lead_id):
+    lead = services.get_lead(lead_id)
+    if lead is None:
+        abort(404)
+    return render_template("lead_detail.html", lead=lead)
+
+
+def get_current_user_id():
+    # Id uživatele z přepínače "pracuji jako", nebo None, když nikdo vybraný není.
+    current_user = get_current_user()
+    return current_user["id"] if current_user else None
+
+
+@app.route("/leads/<int:lead_id>/assign", methods=["POST"])
+def lead_assign(lead_id):
+    # Roli (jen vedoucí) a platnost vstupu kontroluje služba; route jen předá hodnoty.
+    try:
+        result = services.assign_lead(
+            lead_id,
+            to_int(request.form.get("assigned_to")),
+            get_current_user_id(),
+        )
+    except LookupError:
+        abort(404)
+    except (ValueError, PermissionError) as error:
+        flash(str(error), "error")
+    else:
+        if result["changed"]:
+            flash("Poptávka byla přiřazena: " + result["assignee_name"] + ".", "success")
+        else:
+            flash("Poptávka je už přiřazená: " + result["assignee_name"] + ".", "info")
+    # PRG: po POST vždy redirect zpět na detail.
+    return redirect(url_for("lead_detail", lead_id=lead_id))
+
+
+@app.route("/leads/<int:lead_id>/status", methods=["POST"])
+def lead_status(lead_id):
+    try:
+        result = services.change_status(
+            lead_id,
+            request.form.get("status"),
+            get_current_user_id(),
+        )
+    except LookupError:
+        abort(404)
+    except ValueError as error:
+        flash(str(error), "error")
+    else:
+        status_label = config.STATUSES[result["new_status"]]
+        if result["changed"]:
+            flash("Stav byl změněn na: " + status_label + ".", "success")
+        else:
+            flash("Poptávka už má stav: " + status_label + ".", "info")
+    return redirect(url_for("lead_detail", lead_id=lead_id))
 
 
 def is_valid_webhook_token(header_value):

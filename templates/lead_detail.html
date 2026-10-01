@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <p><a href="{{ url_for('index') }}">← Zpět na seznam</a></p>
+  <h1>{{ lead.name }}</h1>
+
+  <table>
+    <tbody>
+      <tr><th>E-mail</th><td>{{ lead.email or "—" }}</td></tr>
+      <tr><th>Telefon</th><td>{{ lead.phone or "—" }}</td></tr>
+      <tr><th>Zdroj</th><td>{{ sources[lead.source] }}</td></tr>
+      <tr><th>Stav</th><td>{{ statuses[lead.status] }}</td></tr>
+      <tr><th>Obchodník</th><td>{{ lead.assigned_name or "Nepřiřazeno" }}</td></tr>
+      <tr><th>Vytvořeno</th><td>{{ lead.created_at | local_time }}</td></tr>
+      <tr><th>První reakce</th><td>{% if lead.first_response_at %}{{ lead.first_response_at | local_time }}{% else %}zatím bez reakce{% endif %}</td></tr>
+      <tr><th>Poslední aktivita</th><td>{{ lead.last_activity_at | local_time }}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Zpráva</h2>
+  <p style="white-space: pre-wrap;">{{ lead.message or "—" }}</p>
+
+  <h2>Změny</h2>
+  {% if not current_user %}
+    <p><em>Pro změny nahoře vyberte, kdo pracuje.</em></p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('lead_status', lead_id=lead.id) }}">
+    <label>Stav
+      <select name="status">
+        {% for key, label in statuses.items() %}
+          <option value="{{ key }}" {% if lead.status == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Změnit stav</button>
+  </form>
+
+  {# Formulář přiřazení vidí jen vedoucí; roli kontroluje i server. #}
+  {% if current_user and current_user.role == 'manager' %}
+    <form method="post" action="{{ url_for('lead_assign', lead_id=lead.id) }}">
+      <label>Obchodník
+        <select name="assigned_to">
+          {% if lead.assigned_to is none %}
+            <option value="" disabled selected>— vyberte obchodníka —</option>
+          {% endif %}
+          {% for user in users if user.role == 'sales' %}
+            <option value="{{ user.id }}" {% if lead.assigned_to == user.id %}selected{% endif %}>{{ user.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Přiřadit</button>
+    </form>
+  {% endif %}
+
+  {# Historie aktivit a zápis ruční aktivity přibude v kroku 8. #}
+{% endblock %}
