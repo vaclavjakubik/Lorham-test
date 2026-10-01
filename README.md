@@ -4,7 +4,7 @@ Prototyp pro firmu, která dostává 100–150 poptávek měsíčně z webu, Met
 
 ## 1. Odkazy
 
-Aplikace běží na https://lorham-test.onrender.com/. Je na free tieru Renderu, takže po nečinnosti usne a první načtení chvíli trvá. Demo video s ukázkou aplikace je tady: [ODKAZ NA VIDEO].
+Aplikace běží na https://lorham-test.onrender.com/. Je na free tieru Renderu, takže po nečinnosti usne a první načtení chvíli trvá.
 
 Přihlášení v prototypu nahrazuje přepínač „pracuji jako“ v horní liště. Vyberete uživatele a aplikace jedná jeho jménem.
 
