@@ -1,9 +1,93 @@
 /* Vlastní doplňky k Pico.css. */
 
+/* Barvy, písmo a rohy podle identity lorham.cz. Přepisujeme proměnné Pico.
+   Selektor :root[data-theme="light"] má stejnou specificitu jako světlá sada v Pico
+   a leží v souboru později, proto vyhraje. Obyčejné :root by prohrálo.
+   Zelená #149255 je jen na tečky, rámečky a focus (kontrast 3,8:1 nestačí na text).
+   Zelený text a odkazy mají tmavší #0D7343 (kontrast 5,7:1). */
+:root[data-theme="light"] {
+  /* písmo a rohy */
+  --pico-font-family: "Inter Tight", var(--pico-font-family-sans-serif);
+  --pico-border-radius: 0.5rem;
+
+  /* pozadí a text */
+  --pico-background-color: #FBFBF9;
+  --pico-color: #131712;
+  --pico-muted-color: #5F675F;
+  --pico-muted-border-color: #E6E8E2;
+  --pico-h1-color: #131712;
+  --pico-h2-color: #131712;
+  --pico-h3-color: #131712;
+  --pico-h4-color: #131712;
+  --pico-h5-color: #131712;
+  --pico-h6-color: #131712;
+  --pico-text-selection-color: rgba(20, 146, 85, 0.2);
+
+  /* odkazy: tmavší zelená kvůli kontrastu */
+  --pico-primary: #0D7343;
+  --pico-primary-hover: #0A5C35;
+  --pico-primary-underline: rgba(13, 115, 67, 0.5);
+  --pico-primary-hover-underline: #0A5C35;
+  --pico-primary-focus: rgba(20, 146, 85, 0.28);
+
+  /* hlavní tlačítko je inkoustově černé, ne zelené */
+  --pico-primary-background: #131712;
+  --pico-primary-border: #131712;
+  --pico-primary-hover-background: #2B312A;
+  --pico-primary-hover-border: #2B312A;
+  --pico-primary-inverse: #FBFBF9;
+
+  /* vedlejší (obrysové) tlačítko */
+  --pico-secondary: #5F675F;
+  --pico-secondary-hover: #131712;
+  --pico-secondary-focus: rgba(20, 146, 85, 0.28);
+
+  /* karty: jemná linka místo stínu */
+  --pico-card-background-color: #FFFFFF;
+  --pico-card-sectioning-background-color: #FBFBF9;
+  --pico-card-box-shadow: 0 0 0 1px #E6E8E2;
+
+  /* tabulky */
+  --pico-table-border-color: #E6E8E2;
+
+  /* pole formulářů: okraj #8A918A má kontrast 3:1 (jemná linka by byla špatně vidět) */
+  --pico-form-element-background-color: #FFFFFF;
+  --pico-form-element-active-background-color: #FFFFFF;
+  --pico-form-element-selected-background-color: #EAF6EE;
+  --pico-form-element-color: #131712;
+  --pico-form-element-placeholder-color: #5F675F;
+  --pico-form-element-border-color: #8A918A;
+  --pico-form-element-active-border-color: #149255;
+  --pico-form-element-focus-color: rgba(20, 146, 85, 0.28);
+
+  /* řádek "Nepřiřazeno": teplá jantarová jako varování */
+  --pico-mark-background-color: #FFF1CC;
+  --pico-mark-color: #131712;
+}
+
+/* Nadpisy: Instrument Sans. Pico zadává váhu nadpisů přímo na elementu,
+   proto ji přepisujeme pravidlem, ne proměnnou v :root. */
+h1, h2, h3, h4, h5, h6 {
+  --pico-font-weight: 500;
+  font-family: "Instrument Sans", var(--pico-font-family-sans-serif);
+  letter-spacing: -0.01em;
+}
+
+h1, h2 {
+  --pico-font-weight: 400;
+  letter-spacing: -0.022em;
+}
+
+/* Karty mají větší zaoblení než tlačítka a pole (12 px proti 8 px). */
+article {
+  border-radius: 0.75rem;
+}
+
 /* Víceřádkový text (zpráva poptávky, poznámky): zachová konce řádků a zalamuje dlouhé řádky.
    Je to jen CSS, text se do stránky vkládá escapovaně (bez |safe). */
 .multiline {
   white-space: pre-line;
+  max-width: 65ch;
 }
 
 /* Štítek SLA příznaku. Význam nese ikona + text, barva je jen doplněk
@@ -33,8 +117,9 @@
 /* Dashboard: velké číslo v kartě souhrnu. Odkaz-štítek v něm má mít stejně velké písmo. */
 .stat {
   margin: 0;
+  font-family: "Instrument Sans", var(--pico-font-family-sans-serif);
   font-size: 2.5rem;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .stat .sla-badge {
@@ -46,23 +131,134 @@ a.sla-badge {
 }
 
 /* Řádek "Nepřiřazeno" s otevřenými poptávkami: nikdo je nemá na starosti.
-   Barva zvýraznění je z Pico, takže funguje ve světlém i tmavém režimu. */
+   Barva zvýraznění je z Pico. */
 .unassigned-row td {
   background: var(--pico-mark-background-color);
   font-weight: 600;
 }
 
-/* Pico se v tmavém režimu přepíná podle systému, štítky proto taky. */
-@media (prefers-color-scheme: dark) {
-  .sla-no_response {
-    background: #4a1717;
-    border-color: #e57373;
-    color: #ffd6d6;
-  }
+/* ---- Rozložení: klidnější a hustší stránky (jen vzhled, žádná změna šablon) ---- */
 
-  .sla-stale {
-    background: #4a2c0a;
-    border-color: #f0a050;
-    color: #ffe0b8;
-  }
+/* Základní písmo má na každé šířce 16 px. Pico ho jinak na velké obrazovce zvětšuje až na 20 px,
+   a tím roste i všechno v rem (tlačítka, pole, mezery). Selektor má vyšší specificitu než Pico. */
+:root[data-theme="light"] {
+  --pico-font-size: 100%;
+}
+
+/* Tenká linka pod navigací ji odděluje od obsahu. */
+nav {
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #E6E8E2;
+}
+
+/* Přepínač "pracuji jako" je testovací pomůcka, proto vypadá jako obrysové ovládání,
+   ne jako hlavní akce. Barvy tlačítka přepisujeme jen uvnitř nav. */
+nav {
+  --pico-primary-background: #FFFFFF;
+  --pico-primary-border: #8A918A;
+  --pico-primary-inverse: #131712;
+  --pico-primary-hover-background: #EAF6EE;
+  --pico-primary-hover-border: #8A918A;
+}
+
+nav select,
+nav button {
+  --pico-form-element-spacing-vertical: 0.45rem;
+  font-size: 0.9rem;
+}
+
+/* Tlačítka jsou kompaktní (výška kolem 40 px) a ve formulářích jen tak široká, jak je text.
+   Pico jim jinak dává šířku 100 %. */
+main button,
+main [role="button"] {
+  --pico-form-element-spacing-vertical: 0.45rem;
+  --pico-form-element-spacing-horizontal: 1.1rem;
+}
+
+main form button[type="submit"] {
+  width: auto;
+}
+
+/* Filtry na seznamu: výběry, zaškrtávátko a tlačítka v jednom řádku, na úzké obrazovce se zalomí. */
+main form[method="get"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+main form[method="get"] .grid {
+  flex: 1 1 28rem;
+}
+
+main form[method="get"] label,
+main form[method="get"] button {
+  margin: 0;
+}
+
+main form[method="get"] select {
+  --pico-form-element-spacing-vertical: 0.45rem;
+  margin-bottom: 0;
+}
+
+/* Nadpisy: menší, s větším odstupem nad sekcí. Zelená tečka u h2 je popisek sekce jako na webu Lorham. */
+main h1 {
+  font-size: 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+main h2 {
+  font-size: 1.25rem;
+  margin: 2rem 0 0.75rem;
+}
+
+main h2::before {
+  content: "";
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.6rem;
+  border-radius: 50%;
+  background: #149255;
+  vertical-align: middle;
+}
+
+/* Tabulky: hustší buňky, hlavička tenkou linkou a šedě místo tlusté čáry. */
+main th,
+main td {
+  padding: 0.6rem 0.75rem;
+}
+
+thead th {
+  --pico-font-weight: 500;
+  --pico-border-width: 1px;
+  font-size: 0.85rem;
+  color: var(--pico-muted-color);
+}
+
+/* Data a čísla v posledních dvou sloupcích se nezalamují na dva řádky. */
+.overflow-auto td:not([colspan]):nth-last-child(-n + 2) {
+  white-space: nowrap;
+}
+
+/* Detail poptávky: tabulka s údaji a formuláře nejsou přes celou šířku, ať se oko nemusí vracet. */
+main > table {
+  max-width: 40rem;
+}
+
+tbody th {
+  width: 11rem;
+  color: var(--pico-muted-color);
+}
+
+main > form[method="post"] {
+  max-width: 42rem;
+}
+
+/* Karty (historie aktivit, souhrn): menší vnitřní okraje. */
+main article {
+  --pico-block-spacing-vertical: 0.85rem;
+  --pico-block-spacing-horizontal: 1.1rem;
 }
