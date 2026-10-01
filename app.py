@@ -1,6 +1,7 @@
+import hmac
 from zoneinfo import ZoneInfo
 
-from flask import Flask, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 import config
 import services
@@ -152,3 +153,52 @@ def lead_new():
     else:
         flash("Poptávka byla založena, zatím je nepřiřazená.", "success")
     return redirect(url_for("index"))
+
+
+def is_valid_webhook_token(header_value):
+    # Porovná token z hlavičky s tokenem z nastavení.
+    # compare_digest trvá stejně dlouho, ať se liší první nebo poslední znak,
+    # takže z doby odpovědi nejde token po kouskách uhádnout (timing attack).
+    # Porovnáváme bajty, protože compare_digest s textem s diakritikou spadne.
+    expected = config.WEBHOOK_TOKEN.encode("utf-8")
+    received = (header_value or "").encode("utf-8")
+    if not expected:
+        # Prázdný token v nastavení by jinak pustil dovnitř každého.
+        return False
+    return hmac.compare_digest(received, expected)
+
+
+# Pole z webhooku, která musí být text (nebo chybět / být null).
+WEBHOOK_TEXT_FIELDS = ["name", "email", "phone", "message", "source"]
+
+
+@app.route("/api/leads", methods=["POST"])
+def api_create_lead():
+    # Webhook: jiný systém (web, reklama) pošle poptávku jako JSON.
+    # Nejdřív token, aby cizí volající nezjistil nic o tom, jak data kontrolujeme.
+    if not is_valid_webhook_token(request.headers.get("X-Webhook-Token")):
+        return jsonify({"error": "Neplatný nebo chybějící token."}), 401
+
+    # silent=True: rozbitý JSON nevyhodí chybu, ale vrátí None.
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Tělo požadavku musí být platný JSON objekt."}), 400
+
+    # create_lead počítá s tím, že hodnoty jsou texty; z JSONu může přijít cokoli.
+    for field in WEBHOOK_TEXT_FIELDS:
+        value = data.get(field)
+        if value is not None and not isinstance(value, str):
+            return jsonify({"error": "Pole '" + field + "' musí být text."}), 400
+
+    try:
+        result = services.create_lead(
+            name=data.get("name"),
+            email=data.get("email"),
+            phone=data.get("phone"),
+            message=data.get("message"),
+            source=data.get("source"),
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    return jsonify({"id": result["id"], "assigned_to": result["assigned_to"]}), 201
