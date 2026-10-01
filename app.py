@@ -56,6 +56,8 @@ def inject_common_data():
         "statuses": config.STATUSES,
         "sources": config.SOURCES,
         "roles": config.ROLES,
+        "activity_types": config.ACTIVITY_TYPES,
+        "manual_activity_types": config.MANUAL_ACTIVITY_TYPES,
     }
 
 
@@ -166,7 +168,8 @@ def lead_detail(lead_id):
     lead = services.get_lead(lead_id)
     if lead is None:
         abort(404)
-    return render_template("lead_detail.html", lead=lead)
+    activities = services.list_activities(lead_id)
+    return render_template("lead_detail.html", lead=lead, activities=activities)
 
 
 def get_current_user_id():
@@ -215,6 +218,25 @@ def lead_status(lead_id):
             flash("Stav byl změněn na: " + status_label + ".", "success")
         else:
             flash("Poptávka už má stav: " + status_label + ".", "info")
+    return redirect(url_for("lead_detail", lead_id=lead_id))
+
+
+@app.route("/leads/<int:lead_id>/activities", methods=["POST"])
+def lead_add_activity(lead_id):
+    # Typ aktivity (jen ruční), délku poznámky i autora kontroluje služba.
+    try:
+        services.add_activity(
+            lead_id,
+            request.form.get("type"),
+            request.form.get("note"),
+            get_current_user_id(),
+        )
+    except LookupError:
+        abort(404)
+    except ValueError as error:
+        flash(str(error), "error")
+    else:
+        flash("Aktivita byla zapsána.", "success")
     return redirect(url_for("lead_detail", lead_id=lead_id))
 
 

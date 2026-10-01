@@ -1,0 +1,7 @@
+/* Vlastní doplňky k Pico.css. Barvy SLA přibydou v kroku 9. */
+
+/* Víceřádkový text (zpráva poptávky, poznámky): zachová konce řádků a zalamuje dlouhé řádky.
+   Je to jen CSS, text se do stránky vkládá escapovaně (bez |safe). */
+.multiline {
+  white-space: pre-line;
+}

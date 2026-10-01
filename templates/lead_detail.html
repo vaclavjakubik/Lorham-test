@@ -4,10 +4,17 @@
   <p><a href="{{ url_for('index') }}">← Zpět na seznam</a></p>
   <h1>{{ lead.name }}</h1>
 
+  {# E-mail a telefon jsou odkazy. Předponu mailto: / tel: píšeme my, od uživatele je jen zbytek. #}
   <table>
     <tbody>
-      <tr><th>E-mail</th><td>{{ lead.email or "—" }}</td></tr>
-      <tr><th>Telefon</th><td>{{ lead.phone or "—" }}</td></tr>
+      <tr>
+        <th>E-mail</th>
+        <td>{% if lead.email %}<a href="mailto:{{ lead.email }}">{{ lead.email }}</a>{% else %}—{% endif %}</td>
+      </tr>
+      <tr>
+        <th>Telefon</th>
+        <td>{% if lead.phone %}<a href="tel:{{ lead.phone | replace(' ', '') }}">{{ lead.phone }}</a>{% else %}—{% endif %}</td>
+      </tr>
       <tr><th>Zdroj</th><td>{{ sources[lead.source] }}</td></tr>
       <tr><th>Stav</th><td>{{ statuses[lead.status] }}</td></tr>
       <tr><th>Obchodník</th><td>{{ lead.assigned_name or "Nepřiřazeno" }}</td></tr>
@@ -18,7 +25,7 @@
   </table>
 
   <h2>Zpráva</h2>
-  <p style="white-space: pre-wrap;">{{ lead.message or "—" }}</p>
+  <p class="multiline">{{ lead.message or "—" }}</p>
 
   <h2>Změny</h2>
   {% if not current_user %}
@@ -53,5 +60,36 @@
     </form>
   {% endif %}
 
-  {# Historie aktivit a zápis ruční aktivity přibude v kroku 8. #}
+  <h2>Zapsat aktivitu</h2>
+  {# Povinnost poznámky záleží na typu (u "Poznámka" je povinná), proto ji hlídá server. #}
+  <form method="post" action="{{ url_for('lead_add_activity', lead_id=lead.id) }}">
+    <label>Typ
+      <select name="type">
+        {% for key in manual_activity_types %}
+          <option value="{{ key }}">{{ activity_types[key] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Poznámka (u typu Poznámka povinná, nejvýše 2000 znaků)
+      <textarea name="note" rows="4" maxlength="2000"></textarea>
+    </label>
+    <button type="submit">Zapsat aktivitu</button>
+  </form>
+
+  <h2>Historie</h2>
+  {% for activity in activities %}
+    <article>
+      <header>
+        <strong>{{ activity_types[activity.type] }}</strong>
+        — {{ activity.author_name or "Systém" }}, {{ activity.created_at | local_time }}
+      </header>
+      {% if activity.note %}
+        <p class="multiline">{{ activity.note }}</p>
+      {% else %}
+        <p>—</p>
+      {% endif %}
+    </article>
+  {% else %}
+    <p>Zatím žádné aktivity.</p>
+  {% endfor %}
 {% endblock %}

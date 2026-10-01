@@ -174,6 +174,78 @@ def assign_lead(lead_id, assignee_id, actor_id):
     return {"changed": True, "assignee_name": assignee["name"]}
 
 
+def require_active_user(cur, user_id):
+    # Ověří, že autor akce existuje a je aktivní, jinak vyhodí ValueError.
+    # Bez toho by neplatné id skončilo nesrozumitelnou chybou databáze při zápisu aktivity.
+    cur.execute(
+        "SELECT id FROM users WHERE id = %s AND is_active = TRUE",
+        (user_id,),
+    )
+    if cur.fetchone() is None:
+        raise ValueError("Vybraný uživatel neexistuje nebo není aktivní.")
+
+
+def list_activities(lead_id):
+    # Historie poptávky, nejnovější nahoře. author_name je None u akcí systému.
+    # LEFT JOIN na všechny uživatele (i neaktivní), aby u aktivity zůstalo jméno autora.
+    # id DESC navíc: aktivity z jedné transakce mají stejný čas.
+    return db.fetch_all(
+        """
+        SELECT a.id, a.type, a.note, a.created_at, u.name AS author_name
+        FROM activities a
+        LEFT JOIN users u ON u.id = a.user_id
+        WHERE a.lead_id = %s
+        ORDER BY a.created_at DESC, a.id DESC
+        """,
+        (lead_id,),
+    )
+
+
+def add_activity(lead_id, activity_type, note, actor_id):
+    # Ruční aktivita (telefonát, e-mail, schůzka, poznámka) k poptávce.
+    # Je to zároveň první reakce na poptávku, pokud žádná ještě nebyla.
+    # Stav poptávky NEMĚNÍ, ten mění obchodník sám přes change_status.
+    # Vyhodí: ValueError (neplatný vstup), LookupError (poptávka neexistuje).
+    if activity_type not in config.MANUAL_ACTIVITY_TYPES:
+        raise ValueError("Neplatný typ aktivity.")
+    if actor_id is None:
+        raise ValueError("Nejdřív vyberte, kdo pracuje.")
+
+    # Prohlížeč posílá konec řádku z textarea jako \r\n (2 znaky), ale HTML maxlength
+    # ho počítá jako 1. Sjednotíme na \n, ať server počítá stejně jako formulář.
+    if note is not None:
+        note = note.replace("\r\n", "\n")
+    note = clean_text(note)
+
+    if activity_type == "note" and note is None:
+        raise ValueError("U poznámky vyplňte text.")
+    if note is not None and len(note) > config.ACTIVITY_NOTE_MAX_LENGTH:
+        raise ValueError(
+            "Poznámka může mít nejvýše " + str(config.ACTIVITY_NOTE_MAX_LENGTH) + " znaků."
+        )
+
+    with db.transaction() as cur:
+        require_active_user(cur, actor_id)
+
+        # Jediný UPDATE: sám zamkne řádek poptávky a COALESCE nechá dřívější
+        # first_response_at být (nastaví ho jen poprvé). RETURNING id nám prozradí,
+        # jestli poptávka vůbec existuje.
+        cur.execute(
+            """
+            UPDATE leads
+            SET last_activity_at = now(),
+                first_response_at = COALESCE(first_response_at, now())
+            WHERE id = %s
+            RETURNING id
+            """,
+            (lead_id,),
+        )
+        if cur.fetchone() is None:
+            raise LookupError("Poptávka neexistuje.")
+
+        insert_activity(cur, lead_id, actor_id, activity_type, note)
+
+
 def change_status(lead_id, new_status, actor_id):
     # Změna stavu poptávky. Smí ji udělat kdokoli vybraný v přepínači (actor_id).
     # Vyhodí: ValueError (neplatný vstup), LookupError (poptávka neexistuje).
@@ -184,12 +256,7 @@ def change_status(lead_id, new_status, actor_id):
         raise ValueError("Nejdřív vyberte, kdo pracuje.")
 
     with db.transaction() as cur:
-        cur.execute(
-            "SELECT id FROM users WHERE id = %s AND is_active = TRUE",
-            (actor_id,),
-        )
-        if cur.fetchone() is None:
-            raise ValueError("Vybraný uživatel neexistuje nebo není aktivní.")
+        require_active_user(cur, actor_id)
 
         # FOR UPDATE zamkne řádek poptávky do konce transakce. Když stejnou poptávku
         # mění dva lidé naráz, druhý počká a přečte už nový stav, takže historie

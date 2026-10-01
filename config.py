@@ -47,3 +47,9 @@ ACTIVITY_TYPES = {
     "meeting": "Schůzka",
     "note": "Poznámka",
 }
+
+# Aktivity, které smí zapsat člověk ručně (ostatní vytváří systém sám)
+MANUAL_ACTIVITY_TYPES = ["call", "email", "meeting", "note"]
+
+# Nejdelší povolená poznámka k aktivitě (znaků)
+ACTIVITY_NOTE_MAX_LENGTH = 2000
