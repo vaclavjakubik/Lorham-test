@@ -1,5 +1,6 @@
 import config
 import db
+import emails
 
 # JEDINÉ místo, kde je definované SLA. Poddotaz vrací všechny sloupce poptávky navíc se:
 #   sla_state = 'no_response' (🔴) / 'stale' (🟠) / NULL (v pořádku),
@@ -136,11 +137,11 @@ def find_auto_assignee(cur):
     # Když žádný aktivní obchodník není, vrátí None.
     cur.execute(
         """
-        SELECT u.id, u.name
+        SELECT u.id, u.name, u.email
         FROM users u
         LEFT JOIN leads l ON l.assigned_to = u.id AND l.status NOT IN ('won', 'lost')
         WHERE u.role = 'sales' AND u.is_active = TRUE
-        GROUP BY u.id, u.name
+        GROUP BY u.id, u.name, u.email
         ORDER BY count(l.id), u.id
         LIMIT 1
         """
@@ -152,7 +153,7 @@ def find_assignable_user(cur, user_id):
     # Komu lze poptávku přiřadit: jen aktivní obchodník (role sales).
     # Jinak vyhodí ValueError, aby ruční i automatické cesty měly stejné pravidlo.
     cur.execute(
-        "SELECT id, name FROM users WHERE id = %s AND role = 'sales' AND is_active = TRUE",
+        "SELECT id, name, email FROM users WHERE id = %s AND role = 'sales' AND is_active = TRUE",
         (user_id,),
     )
     user = cur.fetchone()
@@ -163,13 +164,24 @@ def find_assignable_user(cur, user_id):
 
 def apply_assignment(cur, lead_id, new_user, actor_id, old_name=None, automatic=False):
     # JEDINÉ místo, kde se zapisuje přiřazení poptávky (nastaví obchodníka + zapíše aktivitu).
-    # Volají ho create_lead i assign_lead; v kroku 10 sem přibude e-mail.
+    # Volají ho create_lead i assign_lead.
     # Záměrně NEMĚNÍ first_response_at: přiřazení není kontakt se zákazníkem.
     # old_name None = poptávka byla nepřiřazená ("Přiřazeno"), jinak jde o "Přeřazeno".
+    #
+    # E-mail obchodníkovi se tady NEPOSÍLÁ (jsme uvnitř transakce, která se ještě může vrátit
+    # zpátky). Funkce jen rozhodne, jestli se má poslat, a vrátí "objednávku e-mailu"
+    # (slovník) nebo None. Odešle ji až volající po commitu: emails.send_assignment_email().
+    # None = e-mail se neposílá, protože si obchodník poptávku přiřadil sám sobě.
+    # RETURNING vrátí z upravovaného řádku sloupce, které e-mail potřebuje, bez dalšího dotazu.
     cur.execute(
-        "UPDATE leads SET assigned_to = %s, last_activity_at = now() WHERE id = %s",
+        """
+        UPDATE leads SET assigned_to = %s, last_activity_at = now()
+        WHERE id = %s
+        RETURNING name, source, message
+        """,
         (new_user["id"], lead_id),
     )
+    lead = cur.fetchone()
 
     if old_name is None:
         note = "Přiřazeno: " + new_user["name"]
@@ -178,6 +190,17 @@ def apply_assignment(cur, lead_id, new_user, actor_id, old_name=None, automatic=
     if automatic:
         note += " (automaticky)"
     insert_activity(cur, lead_id, actor_id, "assigned", note)
+
+    if actor_id == new_user["id"]:
+        return None
+    return {
+        "to_email": new_user["email"],
+        "to_name": new_user["name"],
+        "lead_id": lead_id,
+        "lead_name": lead["name"],
+        "source": lead["source"],
+        "message": lead["message"],
+    }
 
 
 def get_lead(lead_id):
@@ -239,9 +262,13 @@ def assign_lead(lead_id, assignee_id, actor_id):
         if lead["assigned_to"] == assignee["id"]:
             return {"changed": False, "assignee_name": assignee["name"]}
 
-        apply_assignment(
+        notification = apply_assignment(
             cur, lead_id, assignee, actor_id=actor_id, old_name=lead["assigned_name"]
         )
+
+    # Blok "with" skončil = transakce je commitnutá, teprve teď má smysl posílat e-mail.
+    if notification is not None:
+        emails.send_assignment_email(notification)
 
     return {"changed": True, "assignee_name": assignee["name"]}
 
@@ -493,6 +520,9 @@ def create_lead(name, email, phone, message, source,
     if source not in config.SOURCES:
         raise ValueError("Neplatný zdroj poptávky.")
 
+    # Objednávka e-mailu z apply_assignment; None = nic se posílat nebude.
+    notification = None
+
     with db.transaction() as cur:
         if assigned_to is not None:
             assignee = find_assignable_user(cur, assigned_to)
@@ -520,7 +550,7 @@ def create_lead(name, email, phone, message, source,
         if assignee is not None:
             # Automatické přiřazení dělá systém (autor None), ruční ten, kdo formulář vyplnil.
             automatic = assigned_to is None
-            apply_assignment(
+            notification = apply_assignment(
                 cur, lead_id, assignee,
                 actor_id=None if automatic else actor_id,
                 automatic=automatic,
@@ -528,6 +558,10 @@ def create_lead(name, email, phone, message, source,
 
         if note is not None:
             insert_activity(cur, lead_id, actor_id, "note", note)
+
+    # Poptávka je commitnutá. E-mail se posílá až teď; jeho selhání už nic nezruší.
+    if notification is not None:
+        emails.send_assignment_email(notification)
 
     return {
         "id": lead_id,

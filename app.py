@@ -1,10 +1,15 @@
 import hmac
+import logging
 from zoneinfo import ZoneInfo
 
 from flask import Flask, abort, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 import config
 import services
+
+# Bez tohohle se zprávy úrovně INFO (např. výpis e-mailu v dry-run režimu) do logu nedostanou,
+# protože Python ve výchozím stavu vypisuje až od úrovně WARNING. Na Renderu log čte z výstupu.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY

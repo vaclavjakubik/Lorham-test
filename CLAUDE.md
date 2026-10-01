@@ -22,6 +22,9 @@ Jde o technický test – cílem je rozumné, čitelné a obhajitelné řešení
   (žádný Supabase Auth, žádné Supabase SDK)
 - **psycopg 3** – čisté SQL s parametry, **žádné ORM**
 - **gunicorn** – produkční server, **Render** – hosting (deploy z GitHubu)
+- **Resend** – odesílání e-mailů přes HTTP API (`urllib` ze standardní knihovny, bez nové závislosti).
+  **NE přes SMTP (`smtplib`)**: Render od září 2025 blokuje na free tieru odchozí SMTP porty 25, 465
+  a 587, lokálně by e-mail fungoval a na produkci by tiše padal na timeout. HTTP API jde přes port 443.
 - **Pico.css z CDN** + malý vlastní `static/style.css` (barvy SLA, drobné úpravy)
 - JavaScript jen tam, kde to bez něj nejde. Formuláře + redirect (PRG pattern).
 
@@ -31,6 +34,7 @@ app.py            # Flask aplikace a routy (jen HTTP vrstva, žádná byznys log
 services.py       # byznys logika: create_lead, assign_lead, change_status, add_activity, SLA
 db.py             # připojení k DB a pomocné funkce pro dotazy
 config.py         # konstanty (SLA, stavy, zdroje, popisky v UI) + načtení env proměnných
+emails.py         # e-mail obchodníkovi při přiřazení: složení textu + odeslání přes Resend (dry-run bez klíče)
 templates/
   base.html       # layout, navigace, přepínač „pracuji jako", flash zprávy
     _sla.html       # makro se SLA štítkem (sdílí ho seznam i detail)
@@ -114,6 +118,14 @@ Aktivní obchodník (role `sales`, is_active) s **nejmenším počtem otevřený
 Při shodě vyhrává nižší id. Jeden SQL dotaz (LEFT JOIN + GROUP BY + ORDER BY + LIMIT 1).
 Vedoucí může poptávku kdykoli ručně přeřadit.
 
+### E-mailové upozornění při přiřazení
+- `services.apply_assignment` (jediné místo zápisu přiřazení) vrátí „objednávku e-mailu“, nebo `None`,
+  když si obchodník poptávku přiřadil sám sobě. Funkce e-mail **neposílá**.
+- Odešle ho až `create_lead` / `assign_lead` **po commitu** transakce přes `emails.send_assignment_email`.
+  Důvod: e-mail nejde vzít zpět, takže by po rollbacku přišlo upozornění na poptávku, která neexistuje.
+- Selhání odeslání se jen zaloguje, hlavní akce (založení, přiřazení) proběhne vždy. Timeout HTTP požadavku je 5 s.
+- Prostý text: předmět „Nová poptávka: {jméno}“, v těle zdroj, zkrácený text poptávky a odkaz na detail.
+
 ### Jediný vstupní bod pro založení
 Formulář i webhook volají **stejnou funkci** `services.create_lead(...)`, která:
 1. založí poptávku,
@@ -154,6 +166,10 @@ Vše v jedné transakci.
 - `DATABASE_URL` – connection string ze Supabase (použít **Session pooler**, kvůli IPv4 na Renderu)
 - `SECRET_KEY` – pro Flask session
 - `WEBHOOK_TOKEN` – sdílený tajný token pro webhook
+- `RESEND_API_KEY` – klíč k Resendu; **nepovinný**: bez něj se e-mail jen vypíše do logu (dry-run)
+- `EMAIL_FROM` – odesílatel, např. `Lorham <onboarding@resend.dev>` (bez vlastní ověřené domény
+  Resend pošle jen na e-mail, kterým ses u něj zaregistroval)
+- `APP_BASE_URL` – adresa aplikace pro odkaz v e-mailu (lokálně `http://localhost:5000`, na Renderu `https://<aplikace>.onrender.com`)
 
 ## Příkazy
 ```bash
