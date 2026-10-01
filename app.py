@@ -138,6 +138,21 @@ def read_lead_filters():
     }
 
 
+# Parametry URL, které seznam poptávek zná. Jen ty smí skončit v odkazech, které z URL skládáme.
+FILTER_ARG_NAMES = ["status", "source", "assigned", "neglected", "open", "sla"]
+
+
+def known_filter_args():
+    # Z URL vezme jen známé parametry filtrů. Kdyby se do url_for() předalo cokoli z URL,
+    # parametr "endpoint" by aplikaci shodil (500) a "_anchor" by měnil vygenerovaný odkaz.
+    args = {}
+    for name in FILTER_ARG_NAMES:
+        value = request.args.get(name)
+        if value is not None:
+            args[name] = value
+    return args
+
+
 @app.route("/")
 def index():
     filters = read_lead_filters()
@@ -149,7 +164,7 @@ def index():
 
     # Odkaz zapne (nebo vypne) filtr zanedbaných a ponechá ostatní parametry z URL,
     # aby se neztratilo např. assigned=all.
-    link_args = request.args.to_dict()
+    link_args = known_filter_args()
     link_args.pop("neglected", None)
     if not filters["neglected"]:
         link_args["neglected"] = "1"
@@ -157,7 +172,7 @@ def index():
 
     # Odkaz, který vypne filtry "jen otevřené" a "jen konkrétní SLA příznak"
     # a ostatní parametry nechá být.
-    clear_args = request.args.to_dict()
+    clear_args = known_filter_args()
     clear_args.pop("open", None)
     clear_args.pop("sla", None)
     clear_url = url_for("index", **clear_args)
