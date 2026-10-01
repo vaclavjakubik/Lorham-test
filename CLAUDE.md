@@ -17,7 +17,7 @@ Jde o technický test – cílem je rozumné, čitelné a obhajitelné řešení
 - Když něco v tomhle souboru chybí nebo si nejsi jistý, zeptej se. Nehádej.
 
 ## Stack
-- **Python 3.12 + Flask 3** – serverově renderované stránky přes Jinja2 šablony
+- **Python 3.14 + Flask 3** – serverově renderované stránky přes Jinja2 šablony
 - **PostgreSQL na Supabase** – Supabase používáme JEN jako hostovanou databázi
   (žádný Supabase Auth, žádné Supabase SDK)
 - **psycopg 3** – čisté SQL s parametry, **žádné ORM**

@@ -4,7 +4,7 @@ Prototyp pro firmu, která dostává 100–150 poptávek měsíčně z webu, Met
 
 ## 1. Odkazy
 
-Aplikace běží na https://lorham-test.onrender.com/. Je na free tieru Renderu, takže po nečinnosti usne a první načtení chvíli trvá.
+Aplikace běží na https://lorham-test.onrender.com/. Je na free tieru Renderu, takže po nečinnosti usne a první načtení chvíli trvá. Demo video s ukázkou aplikace je tady: [ODKAZ NA VIDEO].
 
 Přihlášení v prototypu nahrazuje přepínač „pracuji jako“ v horní liště. Vyberete uživatele a aplikace jedná jeho jménem.
 
@@ -53,7 +53,7 @@ Reálné napojení na Meta ani na příchozí poštu prototyp nemá. Příchozí
 
 2. Reakce se nerovná přiřazení a SLA se počítá při čtení. Přiřazení není kontakt se zákazníkem a právě tenhle rozdíl firmu bolí. Výpočet při čtení nepotřebuje plánované úlohy. Neřeším pracovní dobu a víkendy a zanedbané poptávky se jen zobrazí, nikam nevolají.
 
-3. Auto-přiřazení nejméně vytíženému obchodníkovi, při shodě nižší id, a vedoucí může přeřadit. Původně jsem chtěl vybírat podle úspěšnosti obchodníka, chat mi to rozmluvil. Je to férové a stačí jeden SQL dotaz bez ukládání stavu, zatímco samovýběr vede k vybírání lepších leadů a k nepřiřazeným poptávkám. Neřeším specializaci ani dovolenou, neaktivní obchodníky ale vynechávám.
+3. Auto-přiřazení nejméně vytíženému obchodníkovi, při shodě nižší id, a vedoucí může přeřadit. Je to férové a stačí jeden SQL dotaz bez ukládání stavu, zatímco samovýběr vede k vybírání lepších leadů a k nepřiřazeným poptávkám. Neřeším specializaci ani dovolenou, neaktivní obchodníky ale vynechávám.
 
 4. Bez plnohodnotného přihlašování. Auth by snědlo velkou část rozpočtu a není jádro problému. Prototyp proto není bezpečný pro reálná data, kdokoli může jednat jako kdokoli.
 
@@ -67,18 +67,19 @@ Externí jsou služby Supabase (jen databáze), Render (hosting) a Resend (doru�
 
 S AI jsem pracoval takhle:
 
-- Claude chat mi sloužil na plánování a rozhodnutí (stack, pravidla SLA, rozsah). U auto-přiřazení mi změnil názor, viz rozhodnutí 3.
+- Claude chat mi sloužil na plánování a rozhodnutí (stack, pravidla SLA, rozsah).
 - Claude Code psal implementaci po malých krocích, jeden krok byla jedna funkce nebo soubor.
 - `CLAUDE.md` je řídicí dokument se stackem, datovým modelem, byznys pravidly, pořadím kroků a pracovními pravidly. Před změnou napíše plán a počká na moje OK, dělá malé diffy, vysvětluje nové pojmy, nepřidává závislosti bez souhlasu a commity dělám já.
-- Plán jsem schvaloval a hotový krok kontroloval já. Na blokaci SMTP na Renderu jsem upozornil já. AI navrhlo plán, vysvětlilo, proč posílat e-mail až po commitu, napsalo kód a testy a já ověřil doručení.
+- Plán jsem schvaloval a hotový krok kontroloval já. Blokaci SMTP na Renderu odhalil Claude chat při plánování a do implementace jsem ji zadal já. AI navrhlo plán, vysvětlilo, proč posílat e-mail až po commitu, napsalo kód a testy a já ověřil doručení.
 - Identitu Lorhamu jsem vzal ze své knihovny inspirací, kde jsou hodnoty přečtené z CSS lorham.cz. AI je aplikovalo jen do `static/style.css` a importu písem v `base.html`, šablony a funkčnost se nezměnily. Vzhled všech stránek se po úpravě kontroloval v prohlížeči a výsledek jsem schválil já.
 - Automatizované testy v repu nejsou. Testy proti falešnému serveru a skutečné databázi běžely jednorázově při vývoji.
 
 ## 7. Úpravy pro produkci
 
 - Skutečné přihlášení a role místo přepínače „pracuji jako“.
-- E-mail: ověřit doménu firmy v Resendu a použít její adresu v `EMAIL_FROM`. Bez ní Resend podle všeho pošle jen na e-mail vlastníka účtu (neověřeno). `APP_BASE_URL` nastavit na adresu aplikace.
+- E-mail: ověřit doménu firmy v Resendu a použít její adresu v `EMAIL_FROM`. Bez ověřené domény Resend v testovacím režimu doručuje jen na adresu vlastníka účtu. `APP_BASE_URL` nastavit na adresu aplikace.
 - E-maily odesílat na pozadí (fronta nebo vlákno) a po chybě opakovat. Dnes při výpadku Resendu webhook čeká až 5 s.
+- Každý dotaz otevírá nové spojení do databáze. V produkci by se použilo jedno spojení na požadavek nebo connection pool.
 - Dvě poptávky přijaté ve stejný okamžik mohou dostat stejného obchodníka, protože se nezamyká.
 - Dashboard ukazuje jen aktivní obchodníky a průměrnou dobu reakce počítá podle aktuálního obchodníka. Čísla nejsou z jednoho snímku dat.
 - Tmavý režim je vypnutý, protože identita Lorhamu je jen světlá. Písma se načítají z Google Fonts, v produkci by bylo lepší hostovat je vlastní.
@@ -86,11 +87,11 @@ S AI jsem pracoval takhle:
 
 ## 8. Další verze
 
-Záměrně mimo prototyp zůstalo reálné Meta Lead Ads API, parsování příchozích e-mailů, AI klasifikace a scoring leadů, přiřazování podle úspěšnosti obchodníka, deduplikace kontaktů, pracovní doba a víkendy v SLA, editace a mazání poptávek a stránkování. Dál by přibyla podrobnější doba reakce (medián, rozpad po zdrojích), upozornění i původnímu obchodníkovi při přeřazení a detail poptávky ve dvou sloupcích, s informacemi vlevo a akcemi vpravo.
+Jako první by přibylo aktivní upozornění na zanedbané poptávky: denní souhrn e-mailem vedoucímu přes plánovanou úlohu. Dnes se zanedbané poptávky jen zobrazí tomu, kdo se zrovna dívá. Záměrně mimo prototyp zůstalo reálné Meta Lead Ads API, parsování příchozích e-mailů, AI klasifikace a scoring leadů, přiřazování podle úspěšnosti obchodníka, deduplikace kontaktů, pracovní doba a víkendy v SLA, editace a mazání poptávek a stránkování. Dál by přibyla podrobnější doba reakce (medián, rozpad po zdrojích), upozornění i původnímu obchodníkovi při přeřazení a detail poptávky ve dvou sloupcích, s informacemi vlevo a akcemi vpravo.
 
 ## 9. Lokální spuštění
 
-Potřebujete Python 3.12 a databázi PostgreSQL (já použil Supabase, Session pooler).
+Potřebujete Python 3.14 a databázi PostgreSQL (já použil Supabase, Session pooler).
 
 ```bash
 pip install -r requirements.txt
